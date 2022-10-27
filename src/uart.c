@@ -1,6 +1,7 @@
 #include "driver/uart.h"
 #include "esp_log.h"
 #include "string.h"
+#include "uart.h"
 
 #define ECHO_TEST_TXD 4
 #define ECHO_TEST_RXD 5

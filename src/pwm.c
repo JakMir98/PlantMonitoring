@@ -4,6 +4,7 @@
 #include "freertos/task.h"
 #include "driver/adc.h"
 #include "driver/ledc.h"
+#include "pwm.h"
 
 #define SAMPLE_CNT 32
 static const adc1_channel_t adc_channel = ADC_CHANNEL_4;

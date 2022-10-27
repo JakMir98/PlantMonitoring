@@ -25,10 +25,10 @@
 #include <lwip/netdb.h>
 
 #include "nvs_flash.h"
+#include <netdb.h>
 
 #include "driver/i2c.h"
 #include "bmp180.h"
-#include "DHT.h"
 
 typedef struct Measurements
 {
@@ -37,12 +37,13 @@ typedef struct Measurements
     float soilMoisture1;
     float soilMoisture2;
     float bmp_pressure;
-    float bmp_temperature
+    float bmp_temperature;
 } Measurements;
 
 const int LED_PIN = 2;
 const int POT_PIN = 15;
 const int PUSH_BUTTON_PIN = 4;
+const int DHT_PIN = 17;
 const TickType_t oneMsDelay = 1 / portTICK_PERIOD_MS;
 const TickType_t fiveHundredMsDelay = 500 / portTICK_PERIOD_MS;
 const TickType_t oneSecDelay = 1000 / portTICK_PERIOD_MS;
@@ -53,8 +54,8 @@ const TickType_t oneSecDelay = 1000 / portTICK_PERIOD_MS;
 #define EXAMPLE_STATIC_IP_ADDR        "192.168.0.66"
 #define EXAMPLE_STATIC_NETMASK_ADDR   "255.255.255.0"
 #define EXAMPLE_STATIC_GW_ADDR        "192.168.0.1"
-#define EXAMPLE_MAIN_DNS_SERVER       "8.8.8.8"
-#define EXAMPLE_BACKUP_DNS_SERVER     "8.8.4.4"
+#define EXAMPLE_MAIN_DNS_SERVER       "192.168.0.1"
+#define EXAMPLE_BACKUP_DNS_SERVER     "0.0.0.0"
 
 /* The event group allows multiple bits for each event, but we only care about two events:
  * - we are connected to the AP with an IP
@@ -90,22 +91,6 @@ static EventGroupHandle_t s_wifi_event_group;
 static int s_retry_num = 0;
 int wifi_connect_status = 0;
 static SemaphoreHandle_t mutex;
-
-void DHT_readings()
-{
-	setDHTgpio(GPIO_NUM_27);
-	
-	int ret = readDHT();
-		
-	errorHandler(ret);
-    xSemaphoreTake(mutex, portMAX_DELAY);
-    measurements.dht_temperature = getTemperature();
-    measurements.dht_humidity = getHumidity();
-    xSemaphoreGive(mutex);
-
-    vTaskDelay(2000 / portTICK_RATE_MS);
-		
-}
 
 void i2c_master_init()
 {
@@ -243,6 +228,7 @@ static void set_static_ip(esp_netif_t *netif)
         ESP_LOGE(TAG, "Failed to stop dhcp client");
         return;
     }
+    
     esp_netif_ip_info_t ip;
     memset(&ip, 0 , sizeof(esp_netif_ip_info_t));
     ip.ip.addr = ipaddr_addr(EXAMPLE_STATIC_IP_ADDR);
@@ -311,12 +297,12 @@ void connect_wifi(void)
     ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
                                                         ESP_EVENT_ANY_ID,
                                                         &event_handler,
-                                                        NULL,
+                                                        sta_netif,
                                                         &instance_any_id));
     ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT,
                                                         IP_EVENT_STA_GOT_IP,
                                                         &event_handler,
-                                                        NULL,
+                                                        sta_netif,
                                                         &instance_got_ip));
 
     wifi_config_t wifi_config = {
@@ -359,6 +345,7 @@ void connect_wifi(void)
     {
         ESP_LOGE(TAG, "UNEXPECTED EVENT");
     }
+
     ESP_ERROR_CHECK(esp_event_handler_instance_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, instance_got_ip));
     ESP_ERROR_CHECK(esp_event_handler_instance_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, instance_any_id));
 
