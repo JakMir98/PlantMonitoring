@@ -28,6 +28,7 @@
 
 #include "driver/i2c.h"
 #include "bmp180.h"
+#include "DHT.h"
 
 typedef struct Measurements
 {
