@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta http-equiv=\"refresh\" content=\"10\"> 
+        <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">  
+        <link rel=\"icon\" href=\"data:,\">  
+        <link rel=\"stylesheet\" href=\"https://use.fontawesome.com/releases/v5.7.2/css/all.css\"    integrity=\"sha384-fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr\" crossorigin=\"anonymous\"> 
+        <style>
+            html {  font-family: Arial;  display: inline-block;  margin: 0px auto;  text-align: center;} 
+            p {  font-size: 1.2rem;} 
+            h1{  color: #070812;  padding: 2vh;} 
+            .topnav { overflow: hidden; background-color: #241d4b; color: white; font-size: 1.7rem; } 
+            .button {  display: inline-block;  background-color: #b30000; border: none;  border-radius: 4px;  color: white;  padding: 16px 40px;  text-decoration: none;  font-size: 30px;  margin: 2px;  cursor: pointer;} 
+            .button2 {  background-color: #364cf4; } 
+            .content { padding: 20px; } 
+            .card {  background-color: white;  box-shadow: 2px 2px 12px 1px rgba(140,140,140,.5);} 
+            .card-title {  font-size: 1.2rem;  font-weight: bold;  color: #034078} 
+            .cards { max-width: 700px; margin: 0 auto; display: grid; grid-gap: 2rem; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); } 
+            .reading { font-size: 2.8rem; } 
+            .card.temperature { color: #0e7c7b; } 
+            .card.humidity { color: #17bebb; } 
+            .card.pressure { color: #d62246; } 
+            .card.soil { color: #3fca6b; }
+        </style>  
+        <title>ESP32 WEB SERVER</title>
+    </head>
+    <body>  
+        <h2>ESP32 WEB SERVER</h2>  
+        <div class=\"content\">    
+            <div class=\"cards\">     
+                <div class=\"card temperature\">
+                    <h4><i class=\"fas fa-thermometer-half\"></i> Temperatura DHT: </h4><p><span class=\"reading\">%.2f&deg;C</span></p>
+                </div> 
+                <div class=\"card humidity\">
+                    <h4><i class=\"fas fa-tint\"></i> Wilgotnosc DHT: </h4><p><span class=\"reading\">%.2f</span> &percnt;</span></p>
+                </div>
+                <div class=\"card temperature\">
+                    <h4><i class=\"fas fa-thermometer-half\"></i> Temperatura BMP: </h4><p><span class=\"reading\">%.2f&deg;C</span></p>
+                </div>
+                <div class=\"card pressure\">
+                    <h4><i class=\"fas fa-angle-double-down\"></i> Cisnienie BMP: </h4><p><span class=\"reading\">%.2fhPa</span></p>
+                </div>
+                <div class=\"card soil\">
+                    <h4><i class=\"fas fa-angle-double-down\"></i> Wilgotnosc gleby 1: </h4><p><span class=\"reading\">%.2f</span> &percnt;</span></p>
+                </div>
+                <div class=\"card soil\">
+                    <h4><i class=\"fas fa-tint\"></i> Wilgotnosc gleby 2: </h4><p><span class=\"reading\">%.2f</span> &percnt;</span></p>
+                </div>
+                <strong>GPIO2</strong><p><i class=\"fas fa-lightbulb fa-2x\" style=\"color:#c81919;\"></i><p><p>GPIO state: <strong> ON</strong> </p>                  
+                <a href=\"/led2on\"><button class=\"button\">ON</button></a>          
+                <a href=\"/led2off\"><button class=\"button button2\">OFF</button></a>        </p>      
+            </div>    
+        </div>  
+    </body>
+</html>
