@@ -31,14 +31,18 @@ const int POT_PIN = 5;
 #define I2C_MASTER_ACK 0
 #define I2C_MASTER_NACK 1
 
+#define AIR_VALUE -90  
+#define WATER_VALUE 5224   
+#define MAX_16BIT_VALUE 65536
+
 static const char *TAG = "JMBW_ESP32"; // TAG for debug
 Measurements measurements = 
 {
-    .bmpPressure = 1000.0,
+    .bmpPressure = 102400.0,
     .bmpTemperature = 23.4,
-    .bmpAltitude = 56.5,
-    .soilMoisture1 = 15.1,
-    .soilMoisture2 = 16.6
+    .bmpAltitude = 214.5,
+    .soilMoisture1 = 22.1,
+    .soilMoisture2 = 24.6
 };
 static SemaphoreHandle_t mutex;
 
@@ -64,6 +68,27 @@ ads1115_t ads1115_cfg = {
               ADS1115_CFG_MS_MODE_SS,         // Mode is set to single-shot
   .dev_addr = 0x48,
 };
+
+uint16_t map(int x, int in_min, int in_max, int out_min, int out_max) 
+{
+  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
+int map_soil_moisture(int adcValue)
+{
+    int soilPercent = map(adcValue, AIR_VALUE, WATER_VALUE, 0, 100);
+
+    if(soilPercent > 100)
+    {
+        soilPercent = 100;
+    }
+    else if (soilPercent < 0)
+    {
+        soilPercent = 0;
+    }
+
+    return soilPercent;
+}
 
 void bmp180_measurements_task(void *pvParameter)
 {
@@ -132,8 +157,8 @@ void bmp180_measurements_task(void *pvParameter)
 
 void analog_measurements_task(void * params)
 {
-    uint16_t firstChannelResult = 0;
-    uint16_t secondChannelResult = 0;
+    int firstChannelResult = 0;
+    int secondChannelResult = 0;
 
     while(1)
     {
@@ -145,16 +170,19 @@ void analog_measurements_task(void * params)
             vTaskDelay(pdMS_TO_TICKS(5));          // wait 5ms before check again
         }
         firstChannelResult = ADS1115_get_conversion(); 
-        // Return latest conversion value  
-        ESP_LOGI(TAG, "Conversion Value POT: %d", firstChannelResult);
+        if(firstChannelResult > 65000) firstChannelResult = firstChannelResult - MAX_16BIT_VALUE;
+        ESP_LOGI(TAG, "Soil 1: %d", firstChannelResult);
+        firstChannelResult = map_soil_moisture(firstChannelResult);
 
         ADS1115_request_single_ended_AIN1(); 
         while(!ADS1115_get_conversion_state()) 
         {
             vTaskDelay(pdMS_TO_TICKS(5));          
         }
-        secondChannelResult = ADS1115_get_conversion();   
+        secondChannelResult = ADS1115_get_conversion();
+        if(secondChannelResult > 65000) secondChannelResult = secondChannelResult - MAX_16BIT_VALUE;
         ESP_LOGI(TAG, "Soil 2: %d", secondChannelResult);
+        secondChannelResult = map_soil_moisture(secondChannelResult);   
 
         if (xSemaphoreTake(mutex, 1000 / portTICK_PERIOD_MS) == pdTRUE) // oczekiwanie 1s
         {

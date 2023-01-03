@@ -62,7 +62,6 @@ int16_t ADS1115_get_conversion()
 {
     ADS1115_read_to_rwbuff(ADS1115_REG_CONV);
     return (int16_t)BYTES_INT(ads_cfg->rw_buff[0], ads_cfg->rw_buff[1]);
-
 }
 
 esp_err_t ADS1115_set_thresh_by_definition(uint8_t thresh, uint16_t val)
