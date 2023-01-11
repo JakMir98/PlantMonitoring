@@ -15,7 +15,7 @@
 
 #include "bmp180.h"
 
-static const char* TAG = "BMP180 I2C Driver";
+static const char* TAG = "BMP180_JMBW_ESP32";
 
 #define ACK_CHECK_EN    0x1     // I2C master will check ack from slave
 #define ACK_CHECK_DIS   0x0     // I2C master will not check ack from slave

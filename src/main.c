@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h> //Requires by memset
+#include <string.h> 
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -21,20 +21,14 @@
 #include "bmp180.h"
 #include "constants.h"
 #include "httpServer.h"
+#include "utilities.h"
 
-const int POT_PIN = 5;
-#define REFERENCE_PRESSURE 101325l
+#define DEBUG 0
 
 #define SDA_PIN GPIO_NUM_21
 #define SCL_PIN GPIO_NUM_22
 
-#define I2C_MASTER_ACK 0
-#define I2C_MASTER_NACK 1
-
-#define AIR_VALUE -90  
-#define WATER_VALUE 5224   
-#define MAX_16BIT_VALUE 65536
-
+const int REFERENCE_PRESSURE = 101325l;
 static const char *TAG = "JMBW_ESP32"; // TAG for debug
 Measurements measurements = 
 {
@@ -44,7 +38,9 @@ Measurements measurements =
     .soilMoisture1 = 22.1,
     .soilMoisture2 = 24.6
 };
-static SemaphoreHandle_t mutex;
+SemaphoreHandle_t mutex;
+TaskHandle_t bmp180TaskHandle;
+TaskHandle_t analogMeasurementsTaskHandle;
 
 void i2c_master_init()
 {
@@ -54,7 +50,8 @@ void i2c_master_init()
         .scl_io_num = SCL_PIN,
         .sda_pullup_en = GPIO_PULLUP_ENABLE,
         .scl_pullup_en = GPIO_PULLUP_ENABLE,
-        .master.clk_speed = 1000000};
+        .master.clk_speed = 1000000
+        };
     i2c_param_config(I2C_NUM_0, &i2c_config);
     i2c_driver_install(I2C_NUM_0, I2C_MODE_MASTER, 0, 0, 0);
 }
@@ -69,36 +66,16 @@ ads1115_t ads1115_cfg = {
   .dev_addr = 0x48,
 };
 
-uint16_t map(int x, int in_min, int in_max, int out_min, int out_max) 
-{
-  return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
-}
-
-int map_soil_moisture(int adcValue)
-{
-    int soilPercent = map(adcValue, AIR_VALUE, WATER_VALUE, 0, 100);
-
-    if(soilPercent > 100)
-    {
-        soilPercent = 100;
-    }
-    else if (soilPercent < 0)
-    {
-        soilPercent = 0;
-    }
-
-    return soilPercent;
-}
-
 void bmp180_measurements_task(void *pvParameter)
 {
-    while(1) {
-        esp_err_t err;
-        uint32_t pressure;
-        uint8_t flags = 0;
-        float altitude;
-        float temperature;
+    esp_err_t err;
+    uint32_t pressure;
+    uint8_t flags = 0;
+    float altitude;
+    float temperature;
 
+    while(1) 
+    {
         err = bmp180_read_pressure(&pressure);
         if (err != ESP_OK) 
         {
@@ -129,7 +106,7 @@ void bmp180_measurements_task(void *pvParameter)
             flags |= 1 << 2;
         }
 
-        if (xSemaphoreTake(mutex, 1000 / portTICK_PERIOD_MS) == pdTRUE) // oczekiwanie 1s
+        if (xSemaphoreTake(mutex, pdMS_TO_TICKS(1000)) == pdTRUE) // oczekiwanie 1s
         {
             if(flags & (1<<0))
             {
@@ -148,9 +125,15 @@ void bmp180_measurements_task(void *pvParameter)
             
             xSemaphoreGive(mutex);
         }
-
         ESP_LOGI(TAG, "Pressure %d Pa, Altitude %.1f m, Temperature : %.1f oC", pressure, altitude, temperature);
-        vTaskDelay(2500 / portTICK_PERIOD_MS);
+
+        if(DEBUG)
+        {
+            unsigned int used = get_used_stack_size(4096, bmp180TaskHandle);
+            ESP_LOGI(TAG, "used size 2 BMP TASK: %d", used); // around 3600
+            ESP_LOGI(TAG, "UNUSED size 2 BMP TASK: %d", 4096-used);
+        }
+        vTaskDelay(pdMS_TO_TICKS(2500));
     }
     vTaskDelete( NULL );
 }
@@ -170,9 +153,7 @@ void analog_measurements_task(void * params)
             vTaskDelay(pdMS_TO_TICKS(5));          // wait 5ms before check again
         }
         firstChannelResult = ADS1115_get_conversion(); 
-        if(firstChannelResult > 65000) firstChannelResult = firstChannelResult - MAX_16BIT_VALUE;
-        ESP_LOGI(TAG, "Soil 1: %d", firstChannelResult);
-        firstChannelResult = map_soil_moisture(firstChannelResult);
+        firstChannelResult = convert_soil_moisture_value(firstChannelResult);
 
         ADS1115_request_single_ended_AIN1(); 
         while(!ADS1115_get_conversion_state()) 
@@ -180,17 +161,22 @@ void analog_measurements_task(void * params)
             vTaskDelay(pdMS_TO_TICKS(5));          
         }
         secondChannelResult = ADS1115_get_conversion();
-        if(secondChannelResult > 65000) secondChannelResult = secondChannelResult - MAX_16BIT_VALUE;
-        ESP_LOGI(TAG, "Soil 2: %d", secondChannelResult);
-        secondChannelResult = map_soil_moisture(secondChannelResult);   
+        secondChannelResult = convert_soil_moisture_value(secondChannelResult);
 
-        if (xSemaphoreTake(mutex, 1000 / portTICK_PERIOD_MS) == pdTRUE) // oczekiwanie 1s
+        if (xSemaphoreTake(mutex, pdMS_TO_TICKS(1000)) == pdTRUE) // oczekiwanie 1s
         {
             measurements.soilMoisture1 = firstChannelResult;
             measurements.soilMoisture2 = secondChannelResult;
             xSemaphoreGive(mutex);
         }
-        vTaskDelay(2500 / portTICK_RATE_MS);
+
+        if(DEBUG)
+        {
+            unsigned int used = get_used_stack_size(4096, analogMeasurementsTaskHandle);
+            ESP_LOGI(TAG, "used size 2: %d", used); // around 3600
+            ESP_LOGI(TAG, "UNUSED size 2: %d", 4096-used);
+        }
+        vTaskDelay(pdMS_TO_TICKS(2500));
     }
     vTaskDelete(NULL);
 }
@@ -208,19 +194,30 @@ void app_main()
 
     ESP_LOGI(TAG, "ESP_WIFI_MODE_STA");
     connect_wifi();
-
     setup_server();
     i2c_master_init();
     ADS1115_initiate(&ads1115_cfg);
 
     mutex = xSemaphoreCreateMutex();
+    if(mutex == NULL)
+    {
+        ESP_LOGI(TAG, "Mutex NOT created");
+        return;
+    }
+    ESP_LOGI(TAG, "Mutex created");
 
-    xTaskCreate(&analog_measurements_task, "analog_measurements_task", 4096, NULL, 5, NULL);
+    if(pdPASS == xTaskCreate(&analog_measurements_task, "analog_measurements_task", 4096, NULL, 5, &analogMeasurementsTaskHandle))
+    {
+        ESP_LOGI(TAG, "Analog measurements task created");
+    }
 
     ret = bmp180_init(SDA_PIN, SCL_PIN);
     if(ret == ESP_OK)
     {
-        xTaskCreate(&bmp180_measurements_task, "bmp180_measurements_task", 4096, NULL, 5, NULL);
+        if(pdPASS == xTaskCreate(&bmp180_measurements_task, "bmp180_measurements_task", 4096, NULL, 5, &bmp180TaskHandle))
+        {
+            ESP_LOGI(TAG, "BMP180 measurements task created");
+        }
     } 
     else 
     {

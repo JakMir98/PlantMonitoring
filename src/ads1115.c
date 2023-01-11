@@ -6,7 +6,10 @@
 
 #include "ads1115.h"
 
-static const char *ADS_TAG = "ADS1115";
+#define I2C_MASTER_ACK 0
+#define I2C_MASTER_NACK 1
+
+static const char *ADS_TAG = "ADS1115_JMBW_ESP32";
 static ads1115_t *ads_cfg;
 
 static esp_err_t ADS1115_read_to_rwbuff(uint8_t reg_adr);          // Move these to the header file if you need additional r/w capabilities
