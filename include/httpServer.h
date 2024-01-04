@@ -16,8 +16,8 @@
 #include <lwip/netdb.h>
 #include "constants.h"
 
-#define WIFI_SSID "UPC4707825"
-#define WIFI_PASS "Rk8jwm5dssne"
+#define WIFI_SSID ""
+#define WIFI_PASS ""
 #define MAXIMUM_RETRY 5
 #define STATIC_IP_ADDR        "192.168.0.66"
 #define STATIC_NETMASK_ADDR   "255.255.255.0"
